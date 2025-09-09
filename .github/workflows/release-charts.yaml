@@ -14,12 +14,22 @@ on:
         description: "New Webhook version (eg: v0.9.0-rc.14)"
         required: true
         default: ""
+      bump_major:
+        description: "Set 'true' to bump chart major version when the webhook minor version increases (e.g., v0.20.0 → v0.21.0-rc.0). Default: false"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 env:
   CHARTS_REF: ${{ github.event.inputs.charts_ref }}
   WEBHOOK_REF: "${{ github.ref_name }}"
   PREV_WEBHOOK: ${{ github.event.inputs.prev_webhook }}
   NEW_WEBHOOK: ${{ github.event.inputs.new_webhook }}
+  BUMP_MAJOR: ${{ github.event.inputs.bump_major }}
+
 
 jobs:
   create-charts-pr:
@@ -31,30 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
+          repository: furkatgofurov7/webhook
           ref: "${{ env.WEBHOOK_REF }}"
           path: webhook
 
-      - uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
-
-      # Fetch github token just for the charts repository
-      - uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-          repositories: |
-            charts
-
-      - name: Checkout charts repository
+      - name: Checkout furkatgofurov7/charts repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
-          repository: ${{ github.repository_owner }}/charts
+          repository: furkatgofurov7/charts
           ref: "${{ env.CHARTS_REF }}"
-          token: ${{ steps.app-token.outputs.token }}
+          token: "${{ secrets.PUSH_TO_FORKS_TOKEN }}"
           path: charts
           # Allow making git push request later on
           persist-credentials: true
@@ -66,8 +62,8 @@ jobs:
           git config --global user.name "$APP_USER"
           git config --global user.email "${user_id}+${APP_USER}@users.noreply.github.com"
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          APP_USER: "${{ steps.app-token.outputs.app-slug }}[bot]"
+          GH_TOKEN: "${{ secrets.PUSH_TO_FORKS_TOKEN }}"
+          APP_USER: "${{ github.actor }}"
 
       - name: Install dependencies
         run: sudo snap install yq --channel=v4/stable
@@ -82,7 +78,7 @@ jobs:
 
       - name: Push and create pull request
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.PUSH_TO_FORKS_TOKEN }}
         run: |
           cd charts
           git push origin "$BRANCH"
@@ -90,7 +86,7 @@ jobs:
           body=$(../webhook/.github/workflows/scripts/release-message.sh "$PREV_WEBHOOK" "$NEW_WEBHOOK")
 
           gh pr create \
-            --title "[$CHARTS_REF] Bump rancher-webhook to $NEW_WEBHOOK" \
+            --title "[$CHARTS_REF] Bump webhook to $NEW_WEBHOOK" \
             --body "$body" \
             --repo ${{ github.repository_owner }}/charts \
             --head "${{ github.repository_owner }}:$BRANCH" \

@@ -5,7 +5,7 @@ on:
       charts_ref:
         description: "Submit PR against the following rancher/charts branch (eg: dev-v2.10)"
         required: true
-        default: "dev-v2.13"
+        default: "dev-v2.12"
       prev_webhook:
         description: "Previous Webhook version (eg: v0.9.0-rc.13)"
         required: true
@@ -50,7 +50,7 @@ jobs:
         with:
           repository: furkatgofurov7/charts
           ref: "${{ env.CHARTS_REF }}"
-          token: "${{ secrets.PUSH_TO_FORKS_TOKEN }}"
+          token: "${{ secrets.PUSH_TO_FORKS_TOKEN2 }}"
           path: charts
           # Allow making git push request later on
           persist-credentials: true
@@ -62,7 +62,7 @@ jobs:
           git config --global user.name "$APP_USER"
           git config --global user.email "${user_id}+${APP_USER}@users.noreply.github.com"
         env:
-          GH_TOKEN: "${{ secrets.PUSH_TO_FORKS_TOKEN }}"
+          GH_TOKEN: "${{ secrets.PUSH_TO_FORKS_TOKEN2 }}"
           APP_USER: "${{ github.actor }}"
 
       - name: Install dependencies
@@ -78,7 +78,7 @@ jobs:
 
       - name: Push and create pull request
         env:
-          GH_TOKEN: ${{ secrets.PUSH_TO_FORKS_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUSH_TO_FORKS_TOKEN2 }}
         run: |
           cd charts
           git push origin "$BRANCH"

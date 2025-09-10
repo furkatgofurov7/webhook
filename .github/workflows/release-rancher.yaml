@@ -14,6 +14,14 @@ on:
         description: "New Webhook version (eg: v0.5.0-rc.14)"
         required: true
         default: ""
+      bump_major:
+        description: "Set 'true' to bump chart major version when the webhook minor version increases (e.g., v0.23.0 → v0.24.0-rc.0). Default: false"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 env:
   RANCHER_REF: ${{ github.event.inputs.rancher_ref }}
@@ -37,27 +45,36 @@ jobs:
           ref: "${{ env.WEBHOOK_REF }}"
           path: webhook
 
-      - uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      # - uses: rancher-eio/read-vault-secrets@main
+      #   with:
+      #     secrets: |
+      #       secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+      #       secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
 
-      # Fetch github token just for the rancher repository
-      - uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-          repositories: |
-            rancher
+      # # Fetch github token just for the rancher repository
+      # - uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
+      #   id: app-token
+      #   with:
+      #     app-id: ${{ env.APP_ID }}
+      #     private-key: ${{ env.PRIVATE_KEY }}
+      #     repositories: |
+      #       rancher
 
-      - name: Checkout rancher repository
+      # - name: Checkout rancher repository
+      #   uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      #   with:
+      #     repository: ${{ github.repository_owner }}/rancher
+      #     ref: "${{ env.RANCHER_REF }}"
+      #     token: ${{ steps.app-token.outputs.token }}
+      #     path: rancher
+      #     # Allow making git push request later on
+      #     persist-credentials: true
+      - name: Checkout furkatgofurov7/rancher
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
-          repository: ${{ github.repository_owner }}/rancher
+          repository: furkatgofurov7/rancher
           ref: "${{ env.RANCHER_REF }}"
-          token: ${{ steps.app-token.outputs.token }}
+          token: "${{ secrets.PUSH_TO_FORKS_TOKEN2 }}"
           path: rancher
           # Allow making git push request later on
           persist-credentials: true
@@ -73,7 +90,7 @@ jobs:
 
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
-          repository: ${{ github.repository_owner }}/charts
+          repository: furkatgofurov7/charts
           ref: "${{ steps.find_charts_branch.outputs.charts_branch }}"
           path: charts
 
@@ -99,8 +116,8 @@ jobs:
           git config --global user.name "$APP_USER"
           git config --global user.email "${user_id}+${APP_USER}@users.noreply.github.com"
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          APP_USER: "${{ steps.app-token.outputs.app-slug }}[bot]"
+          GH_TOKEN: "${{ secrets.PUSH_TO_FORKS_TOKEN2 }}"
+          APP_USER: "${{ github.actor }}"
 
       - name: Run release script
         run: |
@@ -108,11 +125,11 @@ jobs:
           BRANCH="bump-webhook-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
           git checkout -b "$BRANCH" "$RANCHER_REF"
-          ../webhook/.github/workflows/scripts/release-against-rancher.sh . "$NEW_WEBHOOK"
+          ../webhook/.github/workflows/scripts/release-against-rancher.sh . "$NEW_WEBHOOK" ${{ github.event.inputs.bump_major }}
 
       - name: Push and create pull request
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.PUSH_TO_FORKS_TOKEN2 }}
         run: |
           cd rancher
           git push origin $BRANCH
